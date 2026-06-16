@@ -12,6 +12,10 @@ Lightweight Terminal Editor written in C.
 - Scrolling
 - Terminal-native copy/paste
 
+# Instalation Guide for Linux
+
+run git clone https://github.com/13bluepenguins/lwte.git then build
+
 ## Build
 
 make
