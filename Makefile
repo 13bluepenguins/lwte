@@ -13,8 +13,7 @@ clean:
 	rm -f $(TARGET)
 
 install: $(TARGET)
-	mkdir -p ~/.local/bin
-	cp $(TARGET) ~/.local/bin/
+	cp $(TARGET) /usr/local/bin/
 
 uninstall:
 	rm -f ~/.local/bin/$(TARGET)
