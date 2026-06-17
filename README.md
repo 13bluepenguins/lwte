@@ -9,8 +9,9 @@ Lightweight Terminal Editor written in C.
 - Save files
 - Multi-line editing
 - Arrow key navigation
-- Scrolling
+- Vertical and horizontal crolling
 - Terminal-native copy/paste
+- Search
 
 # Instalation Guide for Linux
 
