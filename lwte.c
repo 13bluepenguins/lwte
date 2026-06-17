@@ -6,6 +6,20 @@
 #include <termios.h>
 #include <sys/ioctl.h>
 
+int visualX(char *line, int cx)
+{
+    int x = 0;
+
+    for (int i = 0; i < cx; i++) {
+        if (line[i] == '\t')
+            x += 8 - (x % 8);
+        else
+            x++;
+    }
+
+    return x;
+}
+
 /* ===================== TERMINAL ===================== */
 
 struct termios orig;
@@ -129,13 +143,14 @@ void saveFile(const char *filename, char **buf, int rows) {
 
 /* ===================== UI ===================== */
 
-void drawUI(const char *file, int modified) {
+void drawUI(const char *file, int modified, int cy) {
     char bar[256];
 
     snprintf(bar, sizeof(bar),
-        " LWTE 0.1 by 13bluepenguins | %s%s | Ctrl+S/:save | Ctrl+Q quit",
+        " LWTE 0.2 [BETA] by 13bluepenguins | %s%s | Ctrl+F search within file | Ctrl+S save | Ctrl+Q quit | Line %d ",
         file,
-        modified ? " *" : ""
+        modified ? " *" : "",
+	cy + 1
     );
 
     write(STDOUT_FILENO, "\x1b[1;1H", 6);
@@ -228,6 +243,65 @@ void backspace(char ***buf, int *rows, int *cy, int *cx) {
     *cx = prevLen;
 }
 
+/* ===================== SEARCH ===================== */
+
+int findText(char **buf, int rows, const char *query, int *outY, int *outX)
+{
+    if (query == NULL || strlen(query) == 0)
+        return 0;
+
+    for (int y = 0; y < rows; y++) {
+
+        char *match = strstr(buf[y], query);
+
+        if (match) {
+            *outY = y;
+            *outX = match - buf[y];
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+char *promptSearch()
+{
+    clearScreen();
+
+    write(STDOUT_FILENO,
+        "Search: ",
+        8
+    );
+
+    char *buf = malloc(256);
+    size_t i = 0;
+    char c;
+
+    while (i < 255) {
+
+        if (read(STDIN_FILENO, &c, 1) != 1)
+            continue;
+
+        if (c == '\n' || c == '\r')
+            break;
+
+        if (c == 127) {
+            if (i > 0) {
+                i--;
+                write(STDOUT_FILENO, "\b \b", 3);
+            }
+            continue;
+        }
+
+        buf[i++] = c;
+        write(STDOUT_FILENO, &c, 1);
+    }
+
+    buf[i] = '\0';
+
+    return buf;
+}
+
 /* ===================== RENDER ===================== */
 
 void getWindowSize(int *rows, int *cols) {
@@ -243,9 +317,9 @@ void getWindowSize(int *rows, int *cols) {
     *cols = ws.ws_col;
 }
 
-void draw(char **buf, int rows, int cx, int cy, int rowoff, const char *file, int mod) {
+void draw(char **buf, int rows, int cx, int cy, int rowoff, int coloff, const char *file, int mod) {
     clearScreen();
-    drawUI(file, mod);
+    drawUI(file, mod, cy);
 
     int screenrows;
     int screencols;
@@ -265,18 +339,23 @@ void draw(char **buf, int rows, int cx, int cy, int rowoff, const char *file, in
         write(STDOUT_FILENO, pos, strlen(pos));
         write(STDOUT_FILENO, "\x1b[2K", 4);
 
-        if (filerow < rows)
-            write(STDOUT_FILENO,
-                  buf[filerow],
-                  strlen(buf[filerow]));
-    }
+	if (filerow < rows) {
+		int len = strlen(buf[filerow]);
 
-    char cursor[32];
+		if (coloff < len) {
+			write(STDOUT_FILENO,
+				buf[filerow] + coloff,
+				len - coloff);
+		}
+	}
+}
+
+char cursor[32];
 
     snprintf(cursor, sizeof(cursor),
         "\x1b[%d;%dH",
         cy - rowoff + TEXT_START,
-        cx + 1
+        visualX(buf[cy], cx) - coloff + 1
     );
 
     write(STDOUT_FILENO, cursor, strlen(cursor));
@@ -304,88 +383,141 @@ int main(int argc, char *argv[]) {
 
     int cx = 0, cy = 0;
     int rowoff = 0;
+    int coloff = 0;
     int modified = 0;
 
     while (1) {
+
         if (cy < 0) cy = 0;
         if (cy >= rows) cy = rows - 1;
 
         if (cx < 0) cx = 0;
-        if (cx > (int)strlen(buf[cy])) cx = strlen(buf[cy]);
+        if (cx > (int)strlen(buf[cy]))
+            cx = strlen(buf[cy]);
 
-int screenrows;
-int screencols;
+        int screenrows;
+        int screencols;
 
-getWindowSize(&screenrows, &screencols);
+        getWindowSize(&screenrows, &screencols);
 
-if (cy < rowoff)
-    rowoff = cy;
+        if (cy < rowoff)
+            rowoff = cy;
 
-if (cy >= rowoff + screenrows - TEXT_START)
-    rowoff = cy - screenrows + TEXT_START + 1;
+        if (cy >= rowoff + screenrows - TEXT_START)
+            rowoff = cy - screenrows + TEXT_START + 1;
 
-draw(buf, rows, cx, cy, rowoff, file, modified);
-	char c;
-if (read(STDIN_FILENO, &c, 1) != 1)
-    continue;
+		int rx = visualX(buf[cy], cx);
 
-/* Arrow keys */
-if (c == '\x1b') {
-    char seq[2];
+		if (rx < coloff)
+			coloff = rx;
 
-    if (read(STDIN_FILENO, &seq[0], 1) != 1)
-        continue;
+		if (rx >= coloff + screencols)
+			coloff = rx - screencols + 1;
 
-    if (read(STDIN_FILENO, &seq[1], 1) != 1)
-        continue;
+        draw(buf, rows, cx, cy, rowoff, coloff, file, modified);
 
-    if (seq[0] == '[') {
-        switch (seq[1]) {
-            case 'A':
-                if (cy > 0) cy--;
-                break;
+        char c;
 
-            case 'B':
-                if (cy < rows - 1) cy++;
-                break;
+        if (read(STDIN_FILENO, &c, 1) != 1)
+            continue;
 
-            case 'C':
-                if (cx < (int)strlen(buf[cy]))
-                    cx++;
-                break;
+        /* Ctrl+F search */
+        if (c == 6) {
 
-            case 'D':
-                if (cx > 0)
-                    cx--;
-                break;
+            char *query = promptSearch();
+
+            int sy;
+            int sx;
+
+            if (findText(buf, rows, query, &sy, &sx)) {
+                cy = sy;
+                cx = sx;
+
+                coloff = visualX(buf[cy], cx) - screencols / 2;
+
+                if (coloff < 0)
+                    coloff = 0;
+            }
+
+            free(query);
+
+            continue;
         }
-    }
 
-    continue;
-}
+        /* Arrow keys */
+        if (c == '\x1b') {
 
-/* Ctrl+X quit */
-if (c == 17)
-    break;
+            char seq[2];
 
-/* Ctrl+S save */
-if (c == 19) {
-    saveFile(file, buf, rows);
-    modified = 0;
-    continue;
-}
+            if (read(STDIN_FILENO, &seq[0], 1) != 1)
+                continue;
 
+            if (read(STDIN_FILENO, &seq[1], 1) != 1)
+                continue;
+
+
+            if (seq[0] == '[') {
+
+                switch (seq[1]) {
+
+                    case 'A':
+                        if (cy > 0) cy--;
+                        break;
+
+                    case 'B':
+                        if (cy < rows - 1) cy++;
+                        break;
+
+                    case 'C':
+                        if (cx < (int)strlen(buf[cy]))
+                            cx++;
+                        break;
+
+                    case 'D':
+                        if (cx > 0)
+                            cx--;
+                        break;
+                }
+            }
+
+            continue;
+        }
+
+
+        /* Ctrl+Q */
+        if (c == 17)
+            break;
+
+
+        /* Ctrl+S */
+        if (c == 19) {
+
+            saveFile(file, buf, rows);
+            modified = 0;
+
+            continue;
+        }
+
+
+        /* Backspace */
         if (c == 127) {
+
             backspace(&buf, &rows, &cy, &cx);
             modified = 1;
+
             continue;
         }
 
+
+        /* Enter */
         if (c == '\n' || c == '\r') {
+
             insertNewline(&buf, &rows, &cy, &cx);
             modified = 1;
+
             continue;
         }
+
 
         insertChar(buf, cy, cx, c);
         cx++;
