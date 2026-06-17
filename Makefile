@@ -16,4 +16,4 @@ install: $(TARGET)
 	cp $(TARGET) /usr/local/bin/
 
 uninstall:
-	rm -f ~/.local/bin/$(TARGET)
+	rm -f /usr/local/bin/$(TARGET)
