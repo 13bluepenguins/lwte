@@ -15,25 +15,41 @@ Lightweight Terminal Editor written in C.
 
 # Instalation Guide for Linux
 
-run git clone https://github.com/13bluepenguins/lwte.git 
+Run: 
+
+```bash
+git clone https://github.com/13bluepenguins/lwte.git 
+```
+
 then 
+
+```bash
 cd lwte
+```
 
 ## Build
 
+```bash
 make
+```
 
 ## Install
 
+```bash
 sudo make install
+```
 
 ## Run
 
+```bash
 lwte filename.txt
+```
 
 or:
 
+```bash
 lwte
+```
 
 to create/open a file.
 
