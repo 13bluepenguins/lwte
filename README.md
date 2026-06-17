@@ -13,7 +13,7 @@ Lightweight Terminal Editor written in C.
 - Terminal-native copy/paste
 - Search
 
-# Instalation Guide for Linux
+# Installation Guide for Linux
 
 Run: 
 
