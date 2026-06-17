@@ -147,7 +147,7 @@ void drawUI(const char *file, int modified, int cy) {
     char bar[256];
 
     snprintf(bar, sizeof(bar),
-        " LWTE 0.2 [BETA] by 13bluepenguins | %s%s | Ctrl+F search within file | Ctrl+S save | Ctrl+Q quit | Line %d ",
+        " LWTE 0.2 by 13bluepenguins | %s%s | Ctrl+F search within file | Ctrl+S save | Ctrl+Q quit | Line %d ",
         file,
         modified ? " *" : "",
 	cy + 1
